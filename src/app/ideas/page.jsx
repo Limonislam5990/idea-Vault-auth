@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { API_URL } from '../../lib/api';
 
 export default function IdeasPage() {
   const [ideas, setIdeas] = useState([]);
@@ -15,10 +16,10 @@ export default function IdeasPage() {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/ideas?search=${search}&category=${category}`)
+    fetch(`${API_URL}/ideas?search=${encodeURIComponent(search)}&category=${encodeURIComponent(category)}`)
       .then((res) => res.json())
       .then((data) => {
-        setIdeas(data);
+        setIdeas(Array.isArray(data) ? data : []);
         setLoading(false);
       })
       .catch((err) => {

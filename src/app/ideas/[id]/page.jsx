@@ -2,9 +2,16 @@
 
 import React, { useState, useEffect, use } from 'react';
 import { toast } from 'react-toastify';
+import { API_URL } from '../../../lib/api';
+import { authClient } from '../../../lib/auth-client';
+
+const withTime = (list = []) =>
+  list.map((c) => ({ ...c, timestamp: c.createdAt ? new Date(c.createdAt).toLocaleString() : '' }));
 
 export default function IdeaDetailsPage({ params }) {
   const { id } = use(params);
+  const { data: session } = authClient.useSession();
+  const user = session?.user ?? null;
   const [idea, setIdea] = useState(null);
   const [loading, setLoading] = useState(true);
   const [comments, setComments] = useState([]);
@@ -13,38 +20,41 @@ export default function IdeaDetailsPage({ params }) {
   const [editText, setEditText] = useState('');
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/ideas/${id}`)
-      .then((res) => {
-        if (!res.ok) {
-          return fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/api/ideas/${id}`);
-        }
-        return res;
-      })
-      .then((res) => res.json())
+    fetch(`${API_URL}/ideas/${id}`)
+      .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         setIdea(data);
-        setLoading(false);
+        setComments(withTime(data?.comments));
       })
-      .catch((err) => {
-        console.error(err);
-        setLoading(false);
-      });
+      .catch((err) => console.error(err))
+      .finally(() => setLoading(false));
   }, [id]);
 
-  const handleAddComment = (e) => {
+  const handleAddComment = async (e) => {
     e.preventDefault();
     if (!newComment.trim()) return;
 
-    const commentData = {
-      id: Date.now().toString(),
-      userName: "Current User",
-      text: newComment,
-      timestamp: new Date().toLocaleString()
-    };
+    try {
+      const res = await fetch(`${API_URL}/ideas/${id}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: newComment,
+          userName: user?.name || "Anonymous",
+          userEmail: user?.email || "",
+          userPhoto: user?.image || "",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Request failed");
 
-    setComments([...comments, commentData]);
-    setNewComment('');
-    toast.success("Comment added successfully!");
+      setComments((prev) => [...prev, ...withTime([data.comment])]);
+      setNewComment('');
+      toast.success("Comment added successfully!");
+    } catch (err) {
+      console.error(err);
+      toast.error("Could not save the comment.");
+    }
   };
 
   const handleStartEdit = (comment) => {
@@ -52,15 +62,38 @@ export default function IdeaDetailsPage({ params }) {
     setEditText(comment.text);
   };
 
-  const handleSaveEdit = (commentId) => {
-    setComments(comments.map(c => c.id === commentId ? { ...c, text: editText } : c));
-    setEditingCommentId(null);
-    toast.success("Comment updated successfully!");
+  const handleSaveEdit = async (commentId) => {
+    try {
+      const res = await fetch(`${API_URL}/ideas/${id}/comments/${commentId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: editText, userEmail: user?.email }),
+      });
+      if (!res.ok) throw new Error("Request failed");
+
+      setComments(comments.map((c) => (c.id === commentId ? { ...c, text: editText } : c)));
+      setEditingCommentId(null);
+      toast.success("Comment updated successfully!");
+    } catch (err) {
+      console.error(err);
+      toast.error("Could not update the comment.");
+    }
   };
 
-  const handleDeleteComment = (commentId) => {
-    setComments(comments.filter(c => c.id !== commentId));
-    toast.success("Comment deleted successfully!");
+  const handleDeleteComment = async (commentId) => {
+    try {
+      const res = await fetch(
+        `${API_URL}/ideas/${id}/comments/${commentId}?email=${encodeURIComponent(user?.email || '')}`,
+        { method: "DELETE" }
+      );
+      if (!res.ok) throw new Error("Request failed");
+
+      setComments(comments.filter((c) => c.id !== commentId));
+      toast.success("Comment deleted successfully!");
+    } catch (err) {
+      console.error(err);
+      toast.error("Could not delete the comment.");
+    }
   };
 
   if (loading) {
@@ -147,10 +180,12 @@ export default function IdeaDetailsPage({ params }) {
                   ) : (
                     <>
                       <p className="text-sm text-slate-300">{comment.text}</p>
-                      <div className="flex space-x-3 text-xxs pt-1">
-                        <button onClick={() => handleStartEdit(comment)} className="text-slate-500 hover:text-white transition-colors">Edit</button>
-                        <button onClick={() => handleDeleteComment(comment.id)} className="text-red-400/70 hover:text-red-400 transition-colors">Delete</button>
-                      </div>
+                      {user?.email && comment.userEmail === user.email && (
+                        <div className="flex space-x-3 text-xxs pt-1">
+                          <button onClick={() => handleStartEdit(comment)} className="text-slate-500 hover:text-white transition-colors">Edit</button>
+                          <button onClick={() => handleDeleteComment(comment.id)} className="text-red-400/70 hover:text-red-400 transition-colors">Delete</button>
+                        </div>
+                      )}
                     </>
                   )}
                 </div>

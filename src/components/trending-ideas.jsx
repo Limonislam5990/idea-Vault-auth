@@ -3,15 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Loader2 } from 'lucide-react';
-
-const FALLBACK_TRENDING_DATA = [
-  { id: "1", title: "EduAI Planner", category: "AI & Education", budget: "$5,000", target: "Teachers" },
-  { id: "2", title: "MediTrack Wearable", category: "HealthTech", budget: "$12,000", target: "Elderly Patients" },
-  { id: "3", title: "EcoGro Hydroponics", category: "AgriTech", budget: "$3,500", target: "Urban Farmers" },
-  { id: "4", title: "FinFlow Micro-Loans", category: "FinTech", budget: "$20,000", target: "Small Businesses" },
-  { id: "5", title: "SafeDrive Analytics", category: "IoT & Tech", budget: "$8,500", target: "Logistics Companies" },
-  { id: "6", title: "DevConnect Platform", category: "Software Development", budget: "$2,000", target: "Junior Developers" }
-];
+import { API_URL } from '../lib/api';
 
 export default function TrendingIdeas() {
   const [ideas, setIdeas] = useState([]);
@@ -21,8 +13,7 @@ export default function TrendingIdeas() {
     const fetchTrendingIdeas = async () => {
       try {
         setLoading(true);
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || "";
-        const res = await fetch(`${apiBase}/ideas?limit=6`);
+        const res = await fetch(`${API_URL}/trending-ideas`);
 
         if (!res.ok) {
           throw new Error(`Request failed with status ${res.status}`);
@@ -31,8 +22,8 @@ export default function TrendingIdeas() {
         const data = await res.json();
         setIdeas(Array.isArray(data) ? data : data.ideas || []);
       } catch (err) {
-        console.warn("Trending ideas API not available yet, showing fallback data:", err.message);
-        setIdeas(FALLBACK_TRENDING_DATA);
+        console.error("Failed to load trending ideas:", err.message);
+        setIdeas([]);
       } finally {
         setLoading(false);
       }
@@ -58,6 +49,8 @@ export default function TrendingIdeas() {
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-green-400" />
           </div>
+        ) : ideas.length === 0 ? (
+          <p className="py-10 text-center text-sm text-slate-500">No ideas to show yet.</p>
         ) : (
           <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
             {ideas.map((idea) => (
@@ -73,8 +66,8 @@ export default function TrendingIdeas() {
                     {idea.title}
                   </h3>
                   <div className="mt-4 space-y-2 text-sm text-slate-400">
-                    <p><strong className="text-slate-300">Target Audience:</strong> {idea.target}</p>
-                    <p><strong className="text-slate-300">Estimated Budget:</strong> {idea.budget}</p>
+                    <p><strong className="text-slate-300">Target Audience:</strong> {idea.targetAudience || 'N/A'}</p>
+                    <p><strong className="text-slate-300">Estimated Budget:</strong> {idea.budget || 'N/A'}</p>
                   </div>
                 </div>
 

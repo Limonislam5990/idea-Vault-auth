@@ -2,8 +2,12 @@
 
 import React, { useState } from 'react';
 import { toast } from 'react-toastify';
+import { API_URL } from '../../lib/api';
+import { authClient } from '../../lib/auth-client';
 
 export default function AddIdeaPage() {
+  const { data: session } = authClient.useSession();
+  const user = session?.user ?? null;
   const [formData, setFormData] = useState({
     title: '',
     shortDescription: '',
@@ -21,28 +25,32 @@ export default function AddIdeaPage() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/ideas`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(formData)
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.insertedId) {
-          toast.success("Startup idea saved successfully!");
-          setFormData({
-            title: '', shortDescription: '', detailedDescription: '',
-            category: 'Tech', tags: '', imageUrl: '', budget: '',
-            targetAudience: '', problemStatement: '', proposedSolution: ''
-          });
-        }
-      })
-      .catch((err) => {
-        console.error(err);
-        toast.error("Failed to save to database.");
+    try {
+      const res = await fetch(`${API_URL}/ideas`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...formData,
+          userEmail: user?.email || "",
+          userName: user?.name || "",
+          userPhoto: user?.image || "",
+        }),
       });
+      const data = await res.json();
+      if (!res.ok || !data.insertedId) throw new Error(data.message || "Request failed");
+
+      toast.success("Startup idea saved successfully!");
+      setFormData({
+        title: '', shortDescription: '', detailedDescription: '',
+        category: 'Tech', tags: '', imageUrl: '', budget: '',
+        targetAudience: '', problemStatement: '', proposedSolution: ''
+      });
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save to database.");
+    }
   };
 
   return (

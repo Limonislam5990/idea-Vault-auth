@@ -2,8 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
+import { API_URL } from '../../lib/api';
+import { authClient } from '../../lib/auth-client';
 
 export default function MyIdeasPage() {
+  const { data: session, isPending } = authClient.useSession();
+  const email = session?.user?.email;
   const [ideas, setIdeas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
@@ -11,15 +15,20 @@ export default function MyIdeasPage() {
   const [selectedIdea, setSelectedIdea] = useState(null);
 
   useEffect(() => {
+    if (isPending) return;
+    if (!email) {
+      setLoading(false);
+      return;
+    }
     fetchIdeas();
-  }, []);
+  }, [email, isPending]);
 
   const fetchIdeas = () => {
     setLoading(true);
-    fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/ideas`)
+    fetch(`${API_URL}/ideas?email=${encodeURIComponent(email)}`)
       .then((res) => res.json())
       .then((data) => {
-        setIdeas(data);
+        setIdeas(Array.isArray(data) ? data : []);
         setLoading(false);
       })
       .catch((err) => {
@@ -40,7 +49,7 @@ export default function MyIdeasPage() {
 
   const handleUpdateSubmit = (e) => {
     e.preventDefault();
-    fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/ideas/${selectedIdea._id}`, {
+    fetch(`${API_URL}/ideas/${selectedIdea._id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(selectedIdea)
@@ -55,7 +64,7 @@ export default function MyIdeasPage() {
   };
 
   const handleDeleteConfirm = () => {
-    fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/ideas/${selectedIdea._id}`, {
+    fetch(`${API_URL}/ideas/${selectedIdea._id}`, {
       method: "DELETE"
     })
       .then((res) => res.json())

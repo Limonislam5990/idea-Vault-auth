@@ -2,8 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { API_URL } from '../../lib/api';
+import { authClient } from '../../lib/auth-client';
 
 export default function MyInteractionsPage() {
+  const { data: session, isPending } = authClient.useSession();
+  const email = session?.user?.email;
   const [commentedIdeas, setCommentedIdeas] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -12,17 +16,22 @@ export default function MyInteractionsPage() {
   }, []);
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/ideas`)
+    if (isPending) return;
+    if (!email) {
+      setLoading(false);
+      return;
+    }
+    fetch(`${API_URL}/my-interactions?email=${encodeURIComponent(email)}`)
       .then((res) => res.json())
       .then((data) => {
-        setCommentedIdeas(data.slice(0, 1));
+        setCommentedIdeas(Array.isArray(data) ? data : []);
         setLoading(false);
       })
       .catch((err) => {
         console.error(err);
         setLoading(false);
       });
-  }, []);
+  }, [email, isPending]);
 
   if (loading) {
     return (
